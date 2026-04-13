@@ -1,5 +1,5 @@
 name: Security Scanning
-description: Composite action that runs TruffleHog secret scanning and OWASP Dependency Check.
+description: Composite action that runs TruffleHog secret scanning, OWASP Dependency Check, and optionally sends an email report.
 
 inputs:
   project-name:
@@ -25,10 +25,66 @@ inputs:
     description: Whether to upload OWASP report as artifact (true/false)
     required: false
     default: 'true'
-  email-report:
-    description: Send the report to mailbox
+  enable-email-report:
+    description: Whether to send OWASP report via email (true/false)
     required: false
     default: 'false'
+  email-user:
+    description: Sender email address
+    required: false
+    default: ''
+  email-password:
+    description: Sender email password or app password
+    required: false
+    default: ''
+  email-to:
+    description: Recipient email address
+    required: false
+    default: ''
+  sonar-project-key:
+    description: SonarCloud project key (used in email report)
+    required: false
+    default: ''
+  gh-commit-sha:
+    description: GitHub commit SHA
+    required: false
+    default: ''
+  gh-commit-author:
+    description: GitHub commit author
+    required: false
+    default: ''
+  gh-commit-message:
+    description: GitHub commit message
+    required: false
+    default: ''
+  gh-ref:
+    description: GitHub ref name (branch/tag)
+    required: false
+    default: ''
+  gh-event:
+    description: GitHub event name
+    required: false
+    default: ''
+  gh-run-id:
+    description: GitHub Actions run ID
+    required: false
+    default: ''
+  gh-run-url:
+    description: GitHub Actions run URL
+    required: false
+    default: ''
+  gh-pr-number:
+    description: Pull request number (if applicable)
+    required: false
+    default: ''
+  gh-pr-title:
+    description: Pull request title (if applicable)
+    required: false
+    default: ''
+  gh-pr-url:
+    description: Pull request URL (if applicable)
+    required: false
+    default: ''
 
 outputs:
   owasp-report-path:
@@ -73,3 +129,32 @@ runs:
       with:
         name: owasp-dependency-check-report
         path: ${{ inputs.owasp-out-dir }}/
+
+    # ── Send OWASP report via email ────────────────────────────────────────
+    # Skipped notice when email report is disabled
+    - name: "[Skipped] Send OWASP report email"
+      if: ${{ inputs.enable-email-report != 'true' }}
+      shell: bash
+      run: echo "::notice::OWASP email report skipped. Set enable-email-report=true to enable."
+
+    # Sends the OWASP HTML report as an email attachment
+    - name: Send OWASP report email
+      if: ${{ inputs.enable-email-report == 'true' }}
+      shell: bash
+      run: python3 scripts/owasp_send_email_report.py
+      env:
+        EMAIL_USER: ${{ inputs.email-user }}
+        EMAIL_PASSWORD: ${{ inputs.email-password }}
+        EMAIL_TO: ${{ inputs.email-to }}
+        OWASP_REPORT_DIR: ${{ inputs.owasp-out-dir }}
+        SONAR_PROJECT_KEY: ${{ inputs.sonar-project-key }}
+        GH_COMMIT_SHA: ${{ inputs.gh-commit-sha }}
+        GH_COMMIT_AUTHOR: ${{ inputs.gh-commit-author }}
+        GH_COMMIT_MESSAGE: ${{ inputs.gh-commit-message }}
+        GH_REF: ${{ inputs.gh-ref }}
+        GH_EVENT: ${{ inputs.gh-event }}
+        GH_RUN_ID: ${{ inputs.gh-run-id }}
+        GH_RUN_URL: ${{ inputs.gh-run-url }}
+        GH_PR_NUMBER: ${{ inputs.gh-pr-number }}
+        GH_PR_TITLE: ${{ inputs.gh-pr-title }}
+        GH_PR_URL: ${{ inputs.gh-pr-url }}
