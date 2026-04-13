@@ -1,0 +1,71 @@
+name: Security Scanning
+description: Composite action that runs TruffleHog secret scanning and OWASP Dependency Check.
+
+inputs:
+  project-name:
+    description: Project name used for OWASP report labeling
+    required: true
+  nvd-api-key:
+    description: NVD API key for OWASP Dependency Check
+    required: false
+    default: ''
+  trufflehog-base-branch:
+    description: Base branch to compare against for TruffleHog
+    required: false
+    default: main
+  owasp-format:
+    description: OWASP report output format (HTML, JSON, XML, CSV, SARIF)
+    required: false
+    default: HTML
+  owasp-out-dir:
+    description: Directory to write OWASP report to
+    required: false
+    default: owasp-report
+  upload-report:
+    description: Whether to upload OWASP report as artifact (true/false)
+    required: false
+    default: 'true'
+
+outputs:
+  owasp-report-path:
+    description: Path to the generated OWASP report directory
+    value: ${{ inputs.owasp-out-dir }}
+
+runs:
+  using: composite
+  steps:
+
+    # ── TruffleHog secret scanning ─────────────────────────────────────────
+    # Scans git history for accidentally committed secrets
+    # (API keys, passwords, tokens, private keys, etc.)
+    # Only fails on verified (high-confidence) secrets to reduce false positives
+    - name: Scan for secrets (TruffleHog)
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: ${{ inputs.trufflehog-base-branch }}
+        extra_args: --only-verified
+
+    # ── OWASP Dependency Check ─────────────────────────────────────────────
+    # Checks all project dependencies against the NVD CVE database
+    # Detects known vulnerabilities in third-party libraries
+    # --enableRetired: also flag dependencies that are no longer maintained
+    - name: OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: ${{ inputs.project-name }}
+        path: '.'
+        format: ${{ inputs.owasp-format }}
+        out: ${{ inputs.owasp-out-dir }}
+        args: >
+          --enableRetired
+          --nvdApiKey ${{ inputs.nvd-api-key }}
+
+    # ── Upload OWASP report as artifact ───────────────────────────────────
+    # Makes the report downloadable from the GitHub Actions run summary
+    - name: Upload OWASP report
+      if: ${{ inputs.upload-report == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: owasp-dependency-check-report
+        path: ${{ inputs.owasp-out-dir }}/
