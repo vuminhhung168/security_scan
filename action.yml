@@ -25,6 +25,10 @@ inputs:
     description: Whether to upload OWASP report as artifact (true/false)
     required: false
     default: 'true'
+  email-report:
+    description: Send the report to mailbox
+    required: false
+    default: 'false'
 
 outputs:
   owasp-report-path:
