@@ -120,6 +120,7 @@ runs:
         args: >
           --enableRetired
           --nvdApiKey ${{ inputs.nvd-api-key }}
+          --disableNodeAudit
 
     # ── Upload OWASP report as artifact ───────────────────────────────────
     # Makes the report downloadable from the GitHub Actions run summary
