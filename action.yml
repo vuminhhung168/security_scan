@@ -13,6 +13,10 @@ inputs:
     description: Base branch to compare against for TruffleHog
     required: false
     default: main
+  enable-odc-scan:
+    description: Whether to run OWASP Dependency Check (true/false)
+    required: false
+    default: 'true'
   owasp-format:
     description: OWASP report output format (HTML, JSON, XML, CSV, SARIF)
     required: false
@@ -110,7 +114,13 @@ runs:
     # Checks all project dependencies against the NVD CVE database
     # Detects known vulnerabilities in third-party libraries
     # --enableRetired: also flag dependencies that are no longer maintained
+    - name: "[Skipped] OWASP Dependency Check"
+      if: ${{ inputs.enable-odc-scan != 'true' }}
+      shell: bash
+      run: echo "::notice::OWASP Dependency Check is disabled. Set enable-odc-scan=true to enable."
+
     - name: OWASP Dependency Check
+      if: ${{ inputs.enable-odc-scan == 'true' }}
       uses: dependency-check/Dependency-Check_Action@main
       with:
         project: ${{ inputs.project-name }}
@@ -125,22 +135,22 @@ runs:
     # ── Upload OWASP report as artifact ───────────────────────────────────
     # Makes the report downloadable from the GitHub Actions run summary
     - name: Upload OWASP report
-      if: ${{ inputs.upload-report == 'true' }}
+      if: ${{ inputs.enable-odc-scan == 'true' && inputs.upload-report == 'true' }}
       uses: actions/upload-artifact@v4
       with:
         name: owasp-dependency-check-report
         path: ${{ inputs.owasp-out-dir }}/
 
     # ── Send OWASP report via email ────────────────────────────────────────
-    # Skipped notice when email report is disabled
+    # Skipped notice when ODC scan or email report is disabled
     - name: "[Skipped] Send OWASP report email"
-      if: ${{ inputs.enable-email-report != 'true' }}
+      if: ${{ inputs.enable-odc-scan != 'true' || inputs.enable-email-report != 'true' }}
       shell: bash
-      run: echo "::notice::OWASP email report skipped. Set enable-email-report=true to enable."
+      run: echo "::notice::OWASP email report skipped. Requires enable-odc-scan=true and enable-email-report=true."
 
     # Sends the OWASP HTML report as an email attachment
     - name: Send OWASP report email
-      if: ${{ inputs.enable-email-report == 'true' }}
+      if: ${{ inputs.enable-odc-scan == 'true' && inputs.enable-email-report == 'true' }}
       shell: bash
       run: python3 scripts/owasp_send_email_report.py
       env:
